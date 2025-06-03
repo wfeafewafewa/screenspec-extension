@@ -1,0 +1,25 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js (将来のビルドツール用)
+node_modules/
+npm-debug.log*
+
+# 一時ファイル
+*.tmp
+*.temp
+
+# ビルド出力
+dist/
+build/
+
+# 開発用設定
+.env
+.env.local
