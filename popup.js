@@ -132,21 +132,142 @@ class ScreenSpecPopup {
                 <div class="screen-time">${new Date(screen.timestamp).toLocaleString('ja-JP')}</div>
             </div>
             <div class="screen-actions">
-                <button class="btn btn-secondary btn-small" onclick="screenSpecPopup.editScreen('${screen.id}')">
+                <button class="btn btn-secondary btn-small edit-btn" data-screen-id="${screen.id}">
                     編集
                 </button>
-                <button class="btn btn-secondary btn-small" onclick="screenSpecPopup.deleteScreen('${screen.id}')">
+                <button class="btn btn-secondary btn-small delete-btn" data-screen-id="${screen.id}">
                     削除
                 </button>
             </div>
         `;
+        
+        // イベントリスナーを追加
+        const editBtn = item.querySelector('.edit-btn');
+        const deleteBtn = item.querySelector('.delete-btn');
+        
+        editBtn.addEventListener('click', () => {
+            this.editScreen(screen.id);
+        });
+        
+        deleteBtn.addEventListener('click', () => {
+            this.deleteScreen(screen.id);
+        });
+        
         return item;
     }
 
     async editScreen(screenId) {
-        // 注釈モードを開く
-        this.openAnnotationMode(screenId);
-        window.close(); // ポップアップを閉じる
+        try {
+            // アクティブなタブを取得
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            
+            // content scriptを使わずに、直接注釈コードを注入
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (screenId) => {
+                    // 注釈モードを直接実装
+                    console.log('🎨 Starting annotation mode directly');
+                    
+                    // 既存のオーバーレイを削除
+                    const existing = document.getElementById('screenspec-direct-overlay');
+                    if (existing) {
+                        existing.remove();
+                    }
+
+                    // 注釈オーバーレイを作成
+                    const overlay = document.createElement('div');
+                    overlay.id = 'screenspec-direct-overlay';
+                    overlay.innerHTML = `
+                        <div style="
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100vw;
+                            height: 100vh;
+                            background: rgba(0, 0, 0, 0.9);
+                            z-index: 999999;
+                            display: flex;
+                            flex-direction: column;
+                        ">
+                            <div style="
+                                background: white;
+                                padding: 16px;
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                            ">
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <h3 style="margin: 0; color: #333;">🎨 ScreenSpec 注釈モード</h3>
+                                    <span style="color: #666; font-size: 14px;">Screen ID: ${screenId}</span>
+                                </div>
+                                <button id="close-annotation-direct" style="
+                                    background: #dc3545;
+                                    color: white;
+                                    border: none;
+                                    padding: 8px 16px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    font-weight: 500;
+                                ">✕ 閉じる</button>
+                            </div>
+                            <div style="
+                                flex: 1;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                color: white;
+                                text-align: center;
+                                font-family: Arial, sans-serif;
+                            ">
+                                <div>
+                                    <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+                                    <h2 style="margin: 0 0 16px 0;">注釈機能が正常に動作しています！</h2>
+                                    <p style="margin: 0; opacity: 0.8; font-size: 16px;">
+                                        これで基本的な通信が確立されました<br>
+                                        次のステップで高度な注釈機能を追加します
+                                    </p>
+                                    <div style="
+                                        background: rgba(255,255,255,0.1);
+                                        padding: 16px;
+                                        border-radius: 8px;
+                                        margin-top: 20px;
+                                        font-size: 14px;
+                                    ">
+                                        ESCキーまたは「閉じる」ボタンで終了
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(overlay);
+
+                    // 閉じるボタンのイベント
+                    document.getElementById('close-annotation-direct').addEventListener('click', () => {
+                        overlay.remove();
+                    });
+
+                    // ESCキーで閉じる
+                    const escHandler = (e) => {
+                        if (e.key === 'Escape') {
+                            overlay.remove();
+                            document.removeEventListener('keydown', escHandler);
+                        }
+                    };
+                    document.addEventListener('keydown', escHandler);
+
+                    console.log('✅ Annotation mode started successfully!');
+                },
+                args: [screenId]
+            });
+            
+            window.close(); // ポップアップを閉じる
+            
+        } catch (error) {
+            console.error('編集モード開始エラー:', error);
+            alert('注釈機能の開始に失敗しました。エラー: ' + error.message);
+        }
     }
 
     async deleteScreen(screenId) {

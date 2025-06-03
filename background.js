@@ -210,9 +210,14 @@ startxref
 const screenSpecBackground = new ScreenSpecBackground();
 
 // 定期的なデータクリーンアップ（1日1回）
-chrome.alarms.create('dataCleanup', { delayInMinutes: 1440, periodInMinutes: 1440 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'dataCleanup') {
-        screenSpecBackground.cleanupOldData();
-    }
-});
+// alarms APIが利用可能かチェック
+if (chrome.alarms) {
+    chrome.alarms.create('dataCleanup', { delayInMinutes: 1440, periodInMinutes: 1440 });
+    chrome.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === 'dataCleanup') {
+            screenSpecBackground.cleanupOldData();
+        }
+    });
+} else {
+    console.log('Alarms API is not available');
+}
