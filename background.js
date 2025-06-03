@@ -42,11 +42,37 @@ class ScreenSpecBackground {
                     await this.handlePDFExport(message);
                     break;
                 
+                case 'saveAnnotations':
+                    await this.handleSaveAnnotations(message, sendResponse);
+                    break;
+                
                 default:
                     console.log('Unknown message action:', message.action);
             }
         } catch (error) {
             console.error('Background script error:', error);
+        }
+    }
+
+    async handleSaveAnnotations(message, sendResponse) {
+        try {
+            const { screens = [] } = await chrome.storage.local.get(['screens']);
+            const screenIndex = screens.findIndex(s => s.id === message.screenId);
+            
+            if (screenIndex !== -1) {
+                screens[screenIndex].annotations = message.annotations;
+                screens[screenIndex].lastModified = new Date().toISOString();
+                await chrome.storage.local.set({ screens });
+                
+                console.log('注釈が保存されました:', message.screenId);
+                sendResponse({ success: true });
+            } else {
+                console.error('画面が見つかりません:', message.screenId);
+                sendResponse({ success: false, error: 'Screen not found' });
+            }
+        } catch (error) {
+            console.error('注釈保存エラー:', error);
+            sendResponse({ success: false, error: error.message });
         }
     }
 
