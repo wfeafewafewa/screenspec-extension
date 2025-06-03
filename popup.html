@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 ScreenSpec</h1>
+            <p>画面設計書作成ツール</p>
+        </div>
+
+        <div class="section">
+            <h3>🖼️ キャプチャ</h3>
+            <button id="captureVisible" class="btn btn-primary">
+                表示部分をキャプチャ
+            </button>
+            <button id="captureFullPage" class="btn btn-secondary">
+                ページ全体をキャプチャ
+            </button>
+        </div>
+
+        <div class="section">
+            <h3>📝 保存済み画面</h3>
+            <div id="savedScreens" class="saved-list">
+                <!-- 保存済みキャプチャがここに表示される -->
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📄 書き出し</h3>
+            <button id="exportPDF" class="btn btn-export" disabled>
+                PDF書き出し
+            </button>
+            <button id="exportJSON" class="btn btn-export" disabled>
+                データ保存
+            </button>
+        </div>
+
+        <div class="footer">
+            <small>v1.0.0</small>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

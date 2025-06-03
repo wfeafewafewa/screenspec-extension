@@ -1,0 +1,17 @@
+{
+    "name": "screenspec-extension",
+    "version": "1.0.0",
+    "description": "Webアプリの画面設計書を効率よく作成・共有するChrome拡張機能",
+    "scripts": {
+      "dev": "echo 'Development mode'",
+      "build": "echo 'Build for production'",
+      "test": "echo 'Run tests'"
+    },
+    "keywords": ["chrome-extension", "screenshot", "ui-design", "documentation"],
+    "author": "Your Name",
+    "license": "MIT",
+    "devDependencies": {
+      "eslint": "^8.0.0",
+      "prettier": "^2.0.0"
+    }
+  }
