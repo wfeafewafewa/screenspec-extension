@@ -1,14 +1,16 @@
 {
     "manifest_version": 3,
-    "name": "ScreenSpec",
-    "version": "1.0.0",
-    "description": "Webアプリの画面設計書を効率よく作成・共有するツール",
+    "name": "ScreenSpec - 画面設計書作成",
+    "version": "2.0.0",
+    "description": "Webページのキャプチャに注釈を付けて、プロフェッショナルなUI設計書を素早く作成できるツール",
     "permissions": [
       "activeTab",
-      "storage",
-      "downloads",
-      "notifications",
-      "scripting"
+      "storage", 
+      "scripting",
+      "tabs"
+    ],
+    "host_permissions": [
+      "<all_urls>"
     ],
     "action": {
       "default_popup": "popup.html",
@@ -19,11 +21,11 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["libs/html2canvas.min.js", "libs/jspdf.min.js"],
+        "resources": [
+          "libs/jspdf.min.js",
+          "annotation.html"
+        ],
         "matches": ["<all_urls>"]
       }
-    ],
-    "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self'"
-    }
-  }
+    ]
+}

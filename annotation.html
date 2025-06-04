@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScreenSpec - 注釈エディター</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f8fafc;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+        }
+
+        .toolbar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar-main {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            background: #f3f4f6;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .tool-btn:hover {
+            background: #e5e7eb;
+        }
+
+        .tool-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        /* PDF出力ボタンのスタイル */
+        .pdf-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-left: 16px;
+            border-left: 1px solid #e5e7eb;
+        }
+
+        .btn-pdf,
+        .btn-pdf-project {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-pdf {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            color: white;
+            box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+        }
+
+        .btn-pdf:hover {
+            background: linear-gradient(135deg, #b91c1c, #dc2626);
+            box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn-pdf:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+        }
+
+        .btn-pdf-project {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            color: white;
+            box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+        }
+
+        .btn-pdf-project:hover {
+            background: linear-gradient(135deg, #6d28d9, #7c3aed);
+            box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn-pdf-project:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+        }
+
+        .btn-pdf .icon,
+        .btn-pdf-project .icon {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* PDF生成中のスタイル */
+        .btn-pdf:disabled,
+        .btn-pdf-project:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-pdf:disabled:hover,
+        .btn-pdf-project:disabled:hover {
+            transform: none !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-picker {
+            width: 40px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .canvas-container {
+            position: relative;
+            flex: 1;
+            overflow: auto;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            overflow: hidden;
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 140px);
+        }
+
+        #annotationCanvas {
+            display: block;
+            cursor: crosshair;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            max-width: calc(100vw - 40px);
+            flex-wrap: wrap;
+        }
+
+        .zoom-btn {
+            background: #f3f4f6;
+            border: none;
+            border-radius: 4px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .zoom-btn:hover {
+            background: #e5e7eb;
+        }
+
+        .zoom-level {
+            font-size: 12px;
+            color: #6b7280;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .fit-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .fit-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .fit-btn:hover {
+            background: #2563eb;
+        }
+
+        .meta-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 300px;
+            height: 100vh;
+            background: white;
+            border-left: 1px solid #e5e7eb;
+            padding: 20px;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .meta-panel.open {
+            transform: translateX(0);
+        }
+
+        .meta-toggle {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .save-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .save-btn:hover {
+            background: #059669;
+        }
+
+        /* 通知スタイル */
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideOutRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            .toolbar-main {
+                margin-left: 0;
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .pdf-section {
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+                padding-left: 0;
+                padding-top: 8px;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .zoom-controls {
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+                justify-content: center;
+            }
+            
+            .meta-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ツールバー -->
+    <div class="toolbar">
+        <div class="toolbar-title">📝 注釈エディター</div>
+        <div class="toolbar-main">
+            <div class="toolbar-section">
+                <button class="tool-btn active" data-tool="text">
+                    📝 テキスト
+                </button>
+                <button class="tool-btn" data-tool="arrow">
+                    ➡️ 矢印
+                </button>
+                <button class="tool-btn" data-tool="rect">
+                    ⬜ 枠線
+                </button>
+                <button class="tool-btn" data-tool="highlight">
+                    🖍️ ハイライト
+                </button>
+                <button class="tool-btn" data-tool="circle">
+                    ⭕ 円形
+                </button>
+                <input type="color" class="color-picker" id="colorPicker" value="#ff0000">
+                <button class="tool-btn" id="undoBtn">↶ 元に戻す</button>
+                <button class="tool-btn" id="saveBtn">💾 保存</button>
+            </div>
+            
+            <!-- PDF出力セクション -->
+            <div class="pdf-section">
+                <button id="exportPdfBtn" class="btn-pdf" title="この画面のPDF設計書を生成">
+                    <span class="icon">📄</span>
+                    画面PDF
+                </button>
+                <button id="exportProjectPdfBtn" class="btn-pdf-project" title="プロジェクト全体のPDF設計書を生成">
+                    <span class="icon">📊</span>
+                    プロジェクトPDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- キャンバスエリア -->
+    <div class="canvas-container">
+        <div class="canvas-wrapper">
+            <canvas id="annotationCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- ズームコントロール -->
+    <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomOut">−</button>
+        <div class="zoom-level" id="zoomLevel">100%</div>
+        <button class="zoom-btn" id="zoomIn">+</button>
+        <div class="fit-controls">
+            <button class="fit-btn" id="zoom50">50%</button>
+            <button class="fit-btn" id="zoom100">100%</button>
+            <button class="fit-btn" id="zoom150">150%</button>
+            <button class="fit-btn" id="fitWidth">幅に合わせる</button>
+            <button class="fit-btn" id="fitScreen">画面に合わせる</button>
+        </div>
+    </div>
+
+    <!-- メタ情報パネル -->
+    <button class="meta-toggle" id="metaToggle">📋</button>
+    <div class="meta-panel" id="metaPanel">
+        <h3 style="margin-bottom: 20px;">📋 画面情報</h3>
+        <div class="form-group">
+            <label for="screenTitle">画面名</label>
+            <input type="text" id="screenTitle" placeholder="例: ログイン画面">
+        </div>
+        <div class="form-group">
+            <label for="functionName">機能名</label>
+            <input type="text" id="functionName" placeholder="例: ユーザー認証">
+        </div>
+        <div class="form-group">
+            <label for="createdBy">作成者</label>
+            <input type="text" id="createdBy" placeholder="例: 田中太郎">
+        </div>
+        <div class="form-group">
+            <label for="tags">タグ</label>
+            <input type="text" id="tags" placeholder="例: UI, フォーム, 認証">
+        </div>
+        <div class="form-group">
+            <label for="description">説明</label>
+            <textarea id="description" placeholder="この画面の詳細説明を入力してください..."></textarea>
+        </div>
+        <button class="save-btn" id="saveMetaBtn">💾 情報を保存</button>
+    </div>
+
+    <!-- 外部ライブラリ -->
+    <script src="libs/jspdf.min.js"></script>
+    <script src="annotation.js"></script>
+</body>
+</html>

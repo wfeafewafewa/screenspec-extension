@@ -1,442 +1,487 @@
-class ScreenSpecBackground {
-    constructor() {
-        this.init();
+/**
+ * ScreenSpec - Background Script
+ * Chrome拡張機能のバックグラウンド処理（ローカルjsPDF使用）
+ */
+
+console.log('ScreenSpec background loaded');
+
+chrome.runtime.onInstalled.addListener(() => {
+    console.log('ScreenSpec installed successfully');
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('Message received:', request);
+    
+    switch (request.action) {
+        case 'captureScreen':
+            captureScreenSimple(request, sendResponse);
+            return true; // 非同期レスポンス
+            
+        case 'exportPDF':
+            exportPDFViaContentScript(request, sendResponse);
+            return true; // 非同期レスポンス
+            
+        default:
+            console.warn('Unknown action:', request.action);
+            sendResponse({ success: false, error: 'Unknown action: ' + request.action });
+            return false;
     }
+});
 
-    init() {
-        // メッセージリスナーを設定
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            this.handleMessage(message, sender, sendResponse);
-            return true; // 非同期レスポンスを有効にする
-        });
-
-        // インストール時の初期化
-        chrome.runtime.onInstalled.addListener(() => {
-            this.onInstalled();
-        });
-    }
-
-    onInstalled() {
-        console.log('ScreenSpec がインストールされました');
+/**
+ * 画面キャプチャ機能
+ */
+async function captureScreenSimple(request, sendResponse) {
+    try {
+        console.log('Starting capture...', request.type);
         
-        // 初期データ構造を設定
-        chrome.storage.local.get(['screens'], (result) => {
-            if (!result.screens) {
-                chrome.storage.local.set({ screens: [] });
-            }
-        });
-    }
-
-    async handleMessage(message, sender, sendResponse) {
-        try {
-            switch (message.action) {
-                case 'fullPageCaptured':
-                    await this.handleFullPageCapture(message, sender);
-                    break;
-                
-                case 'captureError':
-                    this.handleCaptureError(message, sender);
-                    break;
-                
-                case 'exportPDF':
-                    await this.handlePDFExport(message);
-                    break;
-                
-                case 'saveAnnotations':
-                    await this.handleSaveAnnotations(message, sendResponse);
-                    break;
-                
-                default:
-                    console.log('Unknown message action:', message.action);
-            }
-        } catch (error) {
-            console.error('Background script error:', error);
-        }
-    }
-
-    async handleSaveAnnotations(message, sendResponse) {
-        try {
-            const { screens = [] } = await chrome.storage.local.get(['screens']);
-            const screenIndex = screens.findIndex(s => s.id === message.screenId);
-            
-            if (screenIndex !== -1) {
-                screens[screenIndex].annotations = message.annotations;
-                screens[screenIndex].lastModified = new Date().toISOString();
-                
-                // メタ情報を保存
-                if (message.metadata) {
-                    screens[screenIndex].metadata = {
-                        ...screens[screenIndex].metadata,
-                        ...message.metadata
-                    };
-                }
-                
-                await chrome.storage.local.set({ screens });
-                
-                console.log('注釈とメタ情報が保存されました:', message.screenId);
-                sendResponse({ success: true });
-            } else {
-                console.error('画面が見つかりません:', message.screenId);
-                sendResponse({ success: false, error: 'Screen not found' });
-            }
-        } catch (error) {
-            console.error('注釈保存エラー:', error);
-            sendResponse({ success: false, error: error.message });
-        }
-    }
-
-    async handleFullPageCapture(message, sender) {
-        try {
-            const screenData = {
-                id: Date.now().toString(),
-                dataUrl: message.dataUrl,
-                url: message.url,
-                title: message.title,
-                timestamp: new Date().toISOString(),
-                annotations: [],
-                metadata: {
-                    screenName: '',
-                    functionName: '',
-                    author: '',
-                    description: ''
-                }
-            };
-
-            // ローカルストレージに保存
-            const { screens = [] } = await chrome.storage.local.get(['screens']);
-            screens.push(screenData);
-            await chrome.storage.local.set({ screens });
-
-            // ポップアップに通知（開いている場合）
-            try {
-                chrome.runtime.sendMessage({
-                    action: 'captureComplete',
-                    screenData: screenData
-                });
-            } catch (e) {
-                // ポップアップが開いていない場合のエラーを無視
-            }
-
-            // 成功通知
-            chrome.notifications.create({
-                type: 'basic',
-                iconUrl: 'icons/icon48.png',
-                title: 'ScreenSpec',
-                message: 'フルページキャプチャが完了しました'
-            });
-
-        } catch (error) {
-            console.error('フルページキャプチャ処理エラー:', error);
-        }
-    }
-
-    handleCaptureError(message, sender) {
-        console.error('キャプチャエラー:', message.error);
+        // アクティブタブの情報を取得
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
-        chrome.notifications.create({
-            type: 'basic',
-            iconUrl: 'icons/icon48.png',
-            title: 'ScreenSpec - エラー',
-            message: 'キャプチャに失敗しました: ' + message.error
-        });
-    }
-
-    async handlePDFExport(message) {
-        try {
-            const screens = message.screens;
-            
-            if (!screens || screens.length === 0) {
-                throw new Error('書き出す画面がありません');
-            }
-
-            console.log('📄 Starting simplified PDF generation for', screens.length, 'screens');
-
-            // 簡素化されたPDF生成
-            const htmlContent = this.generateHTMLReport(screens);
-            
-            // HTMLをBlobとしてダウンロード（PDF代替）
-            const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            
-            // ダウンロードを実行
-            const timestamp = new Date().toISOString().split('T')[0];
-            await chrome.downloads.download({
-                url: url,
-                filename: `ScreenSpec設計書_${timestamp}.html`,
-                saveAs: true
+        let dataUrl;
+        if (request.type === 'visible') {
+            // 表示部分のキャプチャ
+            dataUrl = await chrome.tabs.captureVisibleTab(null, {
+                format: 'png',
+                quality: 90
             });
-
-            // 成功通知
-            chrome.notifications.create({
-                type: 'basic',
-                iconUrl: 'icons/icon48.png',
-                title: 'ScreenSpec',
-                message: '📄 HTML設計書の書き出しが完了しました！ブラウザで開いてPDF印刷できます。'
+        } else if (request.type === 'full') {
+            // ページ全体のキャプチャ（表示部分のみでも対応）
+            dataUrl = await chrome.tabs.captureVisibleTab(null, {
+                format: 'png',
+                quality: 90
             });
-
-            // URLを解放
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-        } catch (error) {
-            console.error('❌ PDF書き出しエラー:', error);
-            
-            chrome.notifications.create({
-                type: 'basic',
-                iconUrl: 'icons/icon48.png',
-                title: 'ScreenSpec - エラー',
-                message: 'PDF書き出しに失敗しました: ' + error.message
-            });
+        } else {
+            throw new Error('Invalid capture type: ' + request.type);
         }
-    }
-
-    generateHTMLReport(screens) {
-        const totalAnnotations = screens.reduce((sum, screen) => sum + (screen.annotations?.length || 0), 0);
-        const authors = [...new Set(screens.map(s => s.metadata?.author).filter(a => a))];
-        const now = new Date();
         
-        let html = `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScreenSpec 設計書</title>
-    <style>
-        body {
-            font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f9f9f9;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .cover {
-            text-align: center;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 30px;
-            margin-bottom: 40px;
-        }
-        .cover h1 {
-            font-size: 2.5em;
-            color: #007bff;
-            margin-bottom: 20px;
-        }
-        .cover .stats {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            display: inline-block;
-        }
-        .toc {
-            margin-bottom: 40px;
-        }
-        .toc h2 {
-            color: #007bff;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 10px;
-        }
-        .toc-item {
-            padding: 10px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .screen-section {
-            margin: 40px 0;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .screen-header {
-            background: #007bff;
-            color: white;
-            padding: 20px;
-        }
-        .screen-content {
-            padding: 30px;
-        }
-        .screen-image {
-            max-width: 100%;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            margin: 20px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .metadata {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 15px 0;
-        }
-        .metadata-item {
-            margin: 5px 0;
-        }
-        .tag {
-            background: #e9ecef;
-            color: #495057;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.9em;
-            margin-right: 5px;
-        }
-        @media print {
-            body { background: white; }
-            .container { box-shadow: none; }
-            .screen-section { page-break-inside: avoid; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- 表紙 -->
-        <div class="cover">
-            <h1>📋 ScreenSpec 設計書</h1>
-            <div class="stats">
-                <div><strong>📅 作成日:</strong> ${now.toLocaleDateString('ja-JP')}</div>
-                <div><strong>📊 総画面数:</strong> ${screens.length}画面</div>
-                <div><strong>🎨 総注釈数:</strong> ${totalAnnotations}個</div>
-                ${authors.length > 0 ? `<div><strong>👤 作成者:</strong> ${authors.join(', ')}</div>` : ''}
-            </div>
-        </div>
-
-        <!-- 目次 -->
-        <div class="toc">
-            <h2>📑 目次</h2>
-            ${screens.map((screen, index) => {
-                const title = screen.metadata?.screenName || screen.title || `画面 ${index + 1}`;
-                const functionName = screen.metadata?.functionName || '';
-                return `
-                    <div class="toc-item">
-                        <strong>${index + 1}. ${title}</strong>
-                        ${functionName ? `<br><small style="color: #666;">⚙️ ${functionName}</small>` : ''}
-                    </div>
-                `;
-            }).join('')}
-        </div>
-
-        <!-- 画面詳細 -->
-        ${screens.map((screen, index) => {
-            const title = screen.metadata?.screenName || screen.title || `画面 ${index + 1}`;
-            const metadata = screen.metadata || {};
-            const createdDate = new Date(screen.timestamp).toLocaleDateString('ja-JP');
-            const modifiedDate = screen.lastModified ? new Date(screen.lastModified).toLocaleDateString('ja-JP') : null;
-            const annotationCount = screen.annotations?.length || 0;
-            
-            return `
-                <div class="screen-section">
-                    <div class="screen-header">
-                        <h2>${index + 1}. ${title}</h2>
-                    </div>
-                    <div class="screen-content">
-                        <div class="metadata">
-                            ${metadata.functionName ? `<div class="metadata-item"><strong>⚙️ 機能:</strong> ${metadata.functionName}</div>` : ''}
-                            ${metadata.author ? `<div class="metadata-item"><strong>👤 作成者:</strong> ${metadata.author}</div>` : ''}
-                            ${metadata.tags ? `<div class="metadata-item"><strong>🏷️ タグ:</strong> ${metadata.tags.split(',').map(tag => `<span class="tag">${tag.trim()}</span>`).join('')}</div>` : ''}
-                            <div class="metadata-item"><strong>📅 作成日:</strong> ${createdDate}</div>
-                            ${modifiedDate && modifiedDate !== createdDate ? `<div class="metadata-item"><strong>🔄 更新日:</strong> ${modifiedDate}</div>` : ''}
-                            <div class="metadata-item"><strong>🎨 注釈数:</strong> ${annotationCount}個</div>
-                        </div>
-                        
-                        ${screen.dataUrl ? `<img src="${screen.dataUrl}" alt="${title}" class="screen-image">` : '<p style="color: #666;">画像データがありません</p>'}
-                        
-                        ${metadata.description ? `
-                            <div style="margin-top: 20px;">
-                                <h4>📝 説明</h4>
-                                <p style="background: #f8f9fa; padding: 15px; border-radius: 4px; white-space: pre-wrap;">${metadata.description}</p>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }).join('')}
-
-        <!-- フッター -->
-        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #666;">
-            <small>Generated by ScreenSpec v1.0.0 - ${now.toLocaleString('ja-JP')}</small>
-        </div>
-    </div>
-</body>
-</html>`;
+        console.log('Capture successful!');
         
-        return html;
-    }
-
-    generatePDFData(screens) {
-        // 簡易的なPDFデータ生成
-        // 実際の実装ではjsPDFライブラリを使用
-        let pdfContent = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>
-endobj
-xref
-0 4
-0000000000 65535 f 
-0000000010 00000 n 
-0000000053 00000 n 
-0000000103 00000 n 
-trailer
-<< /Size 4 /Root 1 0 R >>
-startxref
-167
-%%EOF`;
-
-        return pdfContent;
-    }
-
-    // タブが更新された時の処理
-    handleTabUpdate(tabId, changeInfo, tab) {
-        if (changeInfo.status === 'complete') {
-            // content scriptに設定の同期などを行う場合
-        }
-    }
-
-    // ストレージの管理
-    async cleanupOldData() {
-        try {
-            const { screens = [] } = await chrome.storage.local.get(['screens']);
-            
-            // 30日以上古いデータを削除
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            
-            const recentScreens = screens.filter(screen => {
-                const screenDate = new Date(screen.timestamp);
-                return screenDate > thirtyDaysAgo;
-            });
-
-            if (recentScreens.length !== screens.length) {
-                await chrome.storage.local.set({ screens: recentScreens });
-                console.log(`${screens.length - recentScreens.length}件の古いデータを削除しました`);
-            }
-        } catch (error) {
-            console.error('データクリーンアップエラー:', error);
-        }
+        // 画面データを作成
+        const screen = {
+            id: Date.now().toString(),
+            projectId: request.projectId,
+            type: request.type,
+            title: tab.title || 'キャプチャ画面',
+            url: tab.url || 'unknown',
+            dataUrl: dataUrl,
+            thumbnail: dataUrl,
+            createdAt: new Date().toISOString(),
+            annotations: []
+        };
+        
+        // ストレージに保存
+        const result = await chrome.storage.local.get(['screens']);
+        const screens = result.screens || [];
+        screens.push(screen);
+        await chrome.storage.local.set({ screens });
+        
+        // プロジェクトのスクリーン数を更新
+        await updateProjectScreenCount(request.projectId);
+        
+        console.log('Screen saved!');
+        sendResponse({ success: true, screen: screen });
+        
+    } catch (error) {
+        console.error('Capture error:', error);
+        sendResponse({ success: false, error: error.message });
     }
 }
 
-// バックグラウンドスクリプト初期化
-const screenSpecBackground = new ScreenSpecBackground();
-
-// 定期的なデータクリーンアップ（1日1回）
-// alarms APIが利用可能かチェック
-if (chrome.alarms) {
-    chrome.alarms.create('dataCleanup', { delayInMinutes: 1440, periodInMinutes: 1440 });
-    chrome.alarms.onAlarm.addListener((alarm) => {
-        if (alarm.name === 'dataCleanup') {
-            screenSpecBackground.cleanupOldData();
+/**
+ * PDF出力機能（Content Scriptに委譲）
+ */
+async function exportPDFViaContentScript(request, sendResponse) {
+    try {
+        console.log('Starting PDF export...', request.project.name);
+        
+        const { project, screens } = request;
+        
+        if (!screens || screens.length === 0) {
+            throw new Error('出力する画面がありません');
         }
-    });
-} else {
-    console.log('Alarms API is not available');
+        
+        // アクティブタブを取得
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        // jsPDFライブラリを先に注入
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['libs/jspdf.min.js']
+        });
+        
+        // 少し待ってからPDF生成スクリプトを実行
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // PDF生成スクリプトを実行
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: generatePDFInContentScript,
+            args: [project, screens]
+        });
+        
+        if (results && results[0] && results[0].result) {
+            const result = results[0].result;
+            if (result.success) {
+                console.log('PDF export completed!');
+                sendResponse({ success: true, filename: result.filename });
+            } else {
+                throw new Error(result.error);
+            }
+        } else {
+            throw new Error('PDF生成の結果を取得できませんでした');
+        }
+        
+    } catch (error) {
+        console.error('PDF export error:', error);
+        sendResponse({ success: false, error: error.message });
+    }
+}
+
+/**
+ * Content Script内で実行されるPDF生成関数（全ての必要な関数を含む）
+ */
+function generatePDFInContentScript(project, screens) {
+    try {
+        console.log('PDF generation started for project:', project.name);
+        
+        // jsPDFクラスを取得
+        let jsPDFClass = null;
+        if (window.jspdf && window.jspdf.jsPDF) {
+            jsPDFClass = window.jspdf.jsPDF;
+        } else if (window.jsPDF) {
+            jsPDFClass = window.jsPDF;
+        } else if (typeof jsPDF !== 'undefined') {
+            jsPDFClass = jsPDF;
+        } else {
+            return { success: false, error: 'jsPDFライブラリが見つかりません' };
+        }
+        
+        const doc = new jsPDFClass({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+        
+        console.log('Creating PDF with', screens.length, 'screens');
+        
+        // 日本語テキストを HTML として描画して画像化
+        function createJapaneseTextAsImage(text, fontSize = 16, options = {}) {
+            return new Promise((resolve) => {
+                try {
+                    // HTML要素を作成
+                    const container = document.createElement('div');
+                    container.innerHTML = text;
+                    container.style.cssText = `
+                        position: fixed;
+                        top: -9999px;
+                        left: -9999px;
+                        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+                        font-size: ${fontSize}px;
+                        color: #000000;
+                        background: white;
+                        padding: 8px 12px;
+                        white-space: nowrap;
+                        line-height: 1.4;
+                        border-radius: 4px;
+                        box-shadow: none;
+                        z-index: 999999;
+                        ${options.fontWeight ? `font-weight: ${options.fontWeight};` : ''}
+                        ${options.textAlign ? `text-align: ${options.textAlign};` : ''}
+                    `;
+                    
+                    document.body.appendChild(container);
+                    
+                    // html2canvasが利用可能かチェック
+                    if (typeof html2canvas !== 'undefined') {
+                        html2canvas(container, {
+                            backgroundColor: 'white',
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true
+                        }).then(canvas => {
+                            document.body.removeChild(container);
+                            resolve({
+                                dataUrl: canvas.toDataURL('image/png'),
+                                width: canvas.width / 2, // scale=2なので半分に
+                                height: canvas.height / 2
+                            });
+                        }).catch(error => {
+                            console.error('html2canvas failed:', error);
+                            document.body.removeChild(container);
+                            resolve(null);
+                        });
+                    } else {
+                        // html2canvasが使えない場合はCanvasで描画
+                        const rect = container.getBoundingClientRect();
+                        const width = rect.width + 24;
+                        const height = rect.height + 16;
+                        
+                        document.body.removeChild(container);
+                        
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = width * 2;
+                        canvas.height = height * 2;
+                        ctx.scale(2, 2);
+                        
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, width, height);
+                        
+                        ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+                        ctx.fillStyle = '#000000';
+                        ctx.textAlign = options.textAlign || 'left';
+                        ctx.textBaseline = 'middle';
+                        
+                        const x = options.textAlign === 'center' ? width / 2 : 12;
+                        ctx.fillText(text, x, height / 2);
+                        
+                        resolve({
+                            dataUrl: canvas.toDataURL('image/png'),
+                            width: width,
+                            height: height
+                        });
+                    }
+                } catch (error) {
+                    console.error('Text image creation failed:', error);
+                    resolve(null);
+                }
+            });
+        }
+        
+        // 同期版（Promiseを使わない簡易版）
+        function createJapaneseTextImageSync(text, fontSize = 16) {
+            try {
+                // DOM要素を作成してサイズを測定
+                const measureDiv = document.createElement('div');
+                measureDiv.innerHTML = text;
+                measureDiv.style.cssText = `
+                    position: absolute;
+                    top: -9999px;
+                    left: -9999px;
+                    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-size: ${fontSize}px;
+                    white-space: nowrap;
+                    visibility: hidden;
+                `;
+                document.body.appendChild(measureDiv);
+                
+                const rect = measureDiv.getBoundingClientRect();
+                const width = Math.max(100, rect.width + 24);
+                const height = Math.max(30, fontSize * 1.6);
+                
+                document.body.removeChild(measureDiv);
+                
+                // Canvas で描画
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                const scale = 2;
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+                ctx.scale(scale, scale);
+                
+                // 白背景
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, width, height);
+                
+                // テキスト描画
+                ctx.font = `${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif`;
+                ctx.fillStyle = '#000000';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.textRenderingOptimization = 'optimizeQuality';
+                
+                ctx.fillText(text, width / 2, height / 2);
+                
+                return {
+                    dataUrl: canvas.toDataURL('image/png', 1.0),
+                    width: width,
+                    height: height
+                };
+            } catch (error) {
+                console.error('Text image creation failed:', error);
+                return null;
+            }
+        }
+        
+        // ユーティリティ関数
+        function sanitizeFilename(filename) {
+            return filename.replace(/[^\w\s-_.]/g, '').trim() || 'ScreenSpec_Document';
+        }
+        
+        function formatDateForDoc(date) {
+            const d = typeof date === 'string' ? new Date(date) : date;
+            return d.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function formatDateForFilename(date) {
+            return date.toISOString().slice(0, 19).replace(/[T:]/g, '-').replace(/-/g, '');
+        }
+        
+        // タイトルページ追加
+        function addTitlePageToDoc(doc, project) {
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const centerX = pageWidth / 2;
+            
+            // タイトル
+            const titleImg = createJapaneseTextImageSync('画面設計書', 24);
+            if (titleImg) {
+                const mmWidth = titleImg.width * 0.264583;
+                const mmHeight = titleImg.height * 0.264583;
+                doc.addImage(titleImg.dataUrl, 'PNG', centerX - mmWidth/2, 45, mmWidth, mmHeight);
+            }
+            
+            // プロジェクト名
+            const projectImg = createJapaneseTextImageSync(project.name, 18);
+            if (projectImg) {
+                const mmWidth = projectImg.width * 0.264583;
+                const mmHeight = projectImg.height * 0.264583;
+                doc.addImage(projectImg.dataUrl, 'PNG', centerX - mmWidth/2, 70, mmWidth, mmHeight);
+            }
+            
+            // 説明
+            if (project.description) {
+                const descImg = createJapaneseTextImageSync(project.description, 12);
+                if (descImg) {
+                    const mmWidth = Math.min(pageWidth - 20, descImg.width * 0.264583);
+                    const mmHeight = descImg.height * 0.264583;
+                    doc.addImage(descImg.dataUrl, 'PNG', centerX - mmWidth/2, 95, mmWidth, mmHeight);
+                }
+            }
+            
+            // 作成日・画面数
+            const dateImg = createJapaneseTextImageSync(`作成日: ${formatDateForDoc(new Date())}`, 10);
+            const countImg = createJapaneseTextImageSync(`総画面数: ${project.screenCount || 0}画面`, 10);
+            
+            if (dateImg) {
+                const mmWidth = dateImg.width * 0.264583;
+                const mmHeight = dateImg.height * 0.264583;
+                doc.addImage(dateImg.dataUrl, 'PNG', centerX - mmWidth/2, 125, mmWidth, mmHeight);
+            }
+            
+            if (countImg) {
+                const mmWidth = countImg.width * 0.264583;
+                const mmHeight = countImg.height * 0.264583;
+                doc.addImage(countImg.dataUrl, 'PNG', centerX - mmWidth/2, 140, mmWidth, mmHeight);
+            }
+            
+            // フッター
+            const footerImg = createJapaneseTextImageSync('ScreenSpec - 画面設計書作成ツール', 8);
+            if (footerImg) {
+                const mmWidth = footerImg.width * 0.264583;
+                const mmHeight = footerImg.height * 0.264583;
+                doc.addImage(footerImg.dataUrl, 'PNG', centerX - mmWidth/2, pageHeight - 25, mmWidth, mmHeight);
+            }
+        }
+        
+        // 画面ページ追加
+        function addScreenToDoc(doc, screen, pageNumber) {
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 15;
+            const contentWidth = pageWidth - (margin * 2);
+            const maxImageHeight = pageHeight - 140;
+            
+            // ヘッダー
+            const headerImg = createJapaneseTextImageSync(`${pageNumber}. 画面キャプチャ`, 14);
+            if (headerImg) {
+                const mmWidth = headerImg.width * 0.264583;
+                const mmHeight = headerImg.height * 0.264583;
+                doc.addImage(headerImg.dataUrl, 'PNG', margin, 20, mmWidth, mmHeight);
+            }
+            
+            // タイトル
+            const titleImg = createJapaneseTextImageSync(`タイトル: ${screen.title}`, 12);
+            if (titleImg) {
+                const mmWidth = Math.min(contentWidth, titleImg.width * 0.264583);
+                const mmHeight = titleImg.height * 0.264583;
+                doc.addImage(titleImg.dataUrl, 'PNG', margin, 35, mmWidth, mmHeight);
+            }
+            
+            // URL（英語）
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            const url = screen.url.length > 75 ? screen.url.substring(0, 75) + '...' : screen.url;
+            doc.text(`URL: ${url}`, margin, 50);
+            
+            // 作成日・タイプ
+            const dateImg = createJapaneseTextImageSync(`作成日: ${formatDateForDoc(screen.createdAt)}`, 9);
+            const typeImg = createJapaneseTextImageSync(`キャプチャタイプ: ${screen.type === 'visible' ? '表示部分' : 'ページ全体'}`, 9);
+            
+            if (dateImg) {
+                const mmWidth = dateImg.width * 0.264583;
+                const mmHeight = dateImg.height * 0.264583;
+                doc.addImage(dateImg.dataUrl, 'PNG', margin, 55, mmWidth, mmHeight);
+            }
+            
+            if (typeImg) {
+                const mmWidth = typeImg.width * 0.264583;
+                const mmHeight = typeImg.height * 0.264583;
+                doc.addImage(typeImg.dataUrl, 'PNG', margin, 65, mmWidth, mmHeight);
+            }
+            
+            // スクリーン画像
+            const imgWidth = contentWidth;
+            let imgHeight = (imgWidth * 9) / 16;
+            if (imgHeight > maxImageHeight) {
+                imgHeight = maxImageHeight;
+            }
+            
+            const imgY = 80;
+            doc.addImage(screen.dataUrl, 'PNG', margin, imgY, imgWidth, imgHeight);
+            
+            // ページフッター
+            doc.setFontSize(8);
+            doc.text(`${pageNumber}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+        }
+        
+        // PDFを生成
+        addTitlePageToDoc(doc, project);
+        
+        screens.forEach((screen, index) => {
+            console.log('Adding screen', index + 1, ':', screen.title);
+            doc.addPage();
+            addScreenToDoc(doc, screen, index + 1);
+        });
+        
+        // PDFを保存
+        const filename = `${sanitizeFilename(project.name)}_${formatDateForFilename(new Date())}.pdf`;
+        doc.save(filename);
+        
+        console.log('PDF generation completed:', filename);
+        return { success: true, filename: filename };
+        
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ここのユーティリティ関数たちは削除（Content Script内で定義するため）
+
+/**
+ * プロジェクトのスクリーン数を更新
+ */
+async function updateProjectScreenCount(projectId) {
+    try {
+        const result = await chrome.storage.local.get(['projects', 'screens']);
+        const projects = result.projects || [];
+        const screens = result.screens || [];
+        
+        const project = projects.find(p => p.id === projectId);
+        if (project) {
+            project.screenCount = screens.filter(s => s.projectId === projectId).length;
+            await chrome.storage.local.set({ projects });
+        }
+    } catch (error) {
+        console.error('Failed to update project screen count:', error);
+    }
 }

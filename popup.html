@@ -1,47 +1,172 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScreenSpec</title>
     <link rel="stylesheet" href="styles/popup.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📋 ScreenSpec</h1>
-            <p>画面設計書作成ツール</p>
-        </div>
-
-        <div class="section">
-            <h3>🖼️ キャプチャ</h3>
-            <button id="captureVisible" class="btn btn-primary">
-                表示部分をキャプチャ
-            </button>
-            <button id="captureFullPage" class="btn btn-secondary">
-                ページ全体をキャプチャ
-            </button>
-        </div>
-
-        <div class="section">
-            <h3>📝 保存済み画面</h3>
-            <div id="savedScreens" class="saved-list">
-                <!-- 保存済みキャプチャがここに表示される -->
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="title">
+                <span class="icon">📱</span>
+                ScreenSpec
+            </h1>
+            <div class="project-info">
+                <span class="current-project" id="currentProject">プロジェクト未選択</span>
+                <button class="btn-manage" id="btnManage" title="プロジェクト管理">
+                    ⚙️ 管理
+                </button>
             </div>
         </div>
+    </header>
 
-        <div class="section">
-            <h3>📄 書き出し</h3>
-            <button id="exportPDF" class="btn btn-export" disabled>
-                PDF書き出し
-            </button>
-            <button id="exportJSON" class="btn btn-export" disabled>
-                データ保存
-            </button>
-        </div>
+    <!-- メインコンテンツ -->
+    <main class="main-content">
+        <!-- キャプチャセクション -->
+        <section class="capture-section">
+            <h2 class="section-title">📸 キャプチャ</h2>
+            <div class="capture-buttons">
+                <button class="btn-primary" id="btnCaptureVisible">
+                    <span class="btn-icon">🖼️</span>
+                    表示部分をキャプチャ
+                </button>
+                <button class="btn-secondary" id="btnCaptureFull">
+                    <span class="btn-icon">📄</span>
+                    ページ全体をキャプチャ
+                </button>
+            </div>
+        </section>
 
-        <div class="footer">
-            <small>v1.0.0</small>
+        <!-- 画面一覧セクション -->
+        <section class="screens-section">
+            <div class="section-header">
+                <h2 class="section-title">📋 キャプチャ済み画面</h2>
+                <div class="section-actions">
+                    <button class="btn-export" id="btnExport" disabled>
+                        <span class="btn-icon">📥</span>
+                        PDF出力
+                    </button>
+                </div>
+            </div>
+            <div class="screens-list" id="screensList">
+                <div class="empty-state">
+                    <div class="empty-icon">📷</div>
+                    <p>まだキャプチャがありません</p>
+                    <p class="empty-hint">上のボタンからキャプチャを開始してください</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- プロジェクト管理モーダル -->
+    <div class="modal-overlay" id="projectModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📂 プロジェクト管理</h2>
+                <button class="btn-close" id="btnCloseModal">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- 新規プロジェクト作成 -->
+                <div class="project-form">
+                    <h3 class="form-title">新規プロジェクト作成</h3>
+                    <div class="input-group">
+                        <label for="projectName">プロジェクト名</label>
+                        <input type="text" id="projectName" placeholder="例: ECサイトリニューアル" maxlength="50">
+                    </div>
+                    <div class="input-group">
+                        <label for="projectDescription">説明（任意）</label>
+                        <textarea id="projectDescription" placeholder="プロジェクトの詳細説明" maxlength="200"></textarea>
+                    </div>
+                    <button class="btn-create" id="btnCreateProject">
+                        <span class="btn-icon">➕</span>
+                        プロジェクト作成
+                    </button>
+                </div>
+
+                <!-- プロジェクト検索 -->
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="searchProjects" placeholder="🔍 プロジェクトを検索...">
+                    </div>
+                </div>
+
+                <!-- プロジェクト一覧 -->
+                <div class="projects-list">
+                    <h3 class="form-title">既存プロジェクト</h3>
+                    <div class="projects-container" id="projectsContainer">
+                        <div class="empty-state">
+                            <div class="empty-icon">📁</div>
+                            <p>プロジェクトがありません</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- プロジェクト編集モーダル -->
+    <div class="modal-overlay" id="editProjectModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">✏️ プロジェクト編集</h2>
+                <button class="btn-close" id="btnCloseEditModal">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="editProjectName">プロジェクト名</label>
+                    <input type="text" id="editProjectName" maxlength="50">
+                </div>
+                <div class="input-group">
+                    <label for="editProjectDescription">説明</label>
+                    <textarea id="editProjectDescription" maxlength="200"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-save" id="btnSaveProject">
+                        <span class="btn-icon">💾</span>
+                        保存
+                    </button>
+                    <button class="btn-delete" id="btnDeleteProject">
+                        <span class="btn-icon">🗑️</span>
+                        削除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div class="modal-overlay" id="deleteConfirmModal" style="display: none;">
+        <div class="modal-content small">
+            <div class="modal-header">
+                <h2 class="modal-title">⚠️ 削除確認</h2>
+            </div>
+            
+            <div class="modal-body">
+                <p>このプロジェクトを削除しますか？</p>
+                <p class="warning-text">関連するすべてのキャプチャも削除されます。</p>
+                <div class="modal-actions">
+                    <button class="btn-cancel" id="btnCancelDelete">キャンセル</button>
+                    <button class="btn-confirm-delete" id="btnConfirmDelete">削除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ローディング -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>処理中...</p>
+        </div>
+    </div>
+
+    <!-- 通知 -->
+    <div class="notification" id="notification" style="display: none;"></div>
 
     <script src="popup.js"></script>
 </body>

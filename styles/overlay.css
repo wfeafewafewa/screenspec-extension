@@ -1,0 +1,308 @@
+/* ScreenSpec オーバーレイスタイル */
+
+/* 注釈モード時のハイライト */
+[data-screenspec-highlight] {
+    position: relative;
+    z-index: 999990;
+}
+
+/* 注釈マーカー */
+.screenspec-annotation-marker {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: #e74c3c;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 999991;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.screenspec-annotation-marker:hover {
+    transform: scale(1.2);
+    background: #c0392b;
+}
+
+/* 注釈ツールチップ */
+.screenspec-annotation-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    max-width: 200px;
+    z-index: 999992;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    transform: translateY(-100%);
+    margin-top: -8px;
+}
+
+.screenspec-annotation-marker:hover .screenspec-annotation-tooltip {
+    opacity: 1;
+}
+
+/* キャプチャ中のオーバーレイ */
+.screenspec-capturing {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(52, 152, 219, 0.1);
+    z-index: 999998;
+    pointer-events: none;
+    animation: captureIndicator 1s ease-in-out infinite;
+}
+
+@keyframes captureIndicator {
+    0%, 100% {
+        opacity: 0.1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* 選択範囲のハイライト */
+.screenspec-selection-box {
+    position: fixed;
+    border: 2px solid #3498db;
+    background: rgba(52, 152, 219, 0.1);
+    z-index: 999993;
+    pointer-events: none;
+    border-radius: 4px;
+}
+
+/* ツールバー */
+.screenspec-toolbar {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.screenspec-toolbar-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-right: 8px;
+}
+
+.screenspec-toolbar-button {
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.screenspec-toolbar-button:hover {
+    background: #2980b9;
+    transform: translateY(-1px);
+}
+
+.screenspec-toolbar-button.secondary {
+    background: #95a5a6;
+}
+
+.screenspec-toolbar-button.secondary:hover {
+    background: #7f8c8d;
+}
+
+.screenspec-toolbar-button.danger {
+    background: #e74c3c;
+}
+
+.screenspec-toolbar-button.danger:hover {
+    background: #c0392b;
+}
+
+/* モードインジケーター */
+.screenspec-mode-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    z-index: 999999;
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 注釈エディター */
+.screenspec-annotation-editor {
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    z-index: 1000000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.screenspec-annotation-editor h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    color: #2c3e50;
+}
+
+.screenspec-annotation-editor textarea {
+    width: 100%;
+    height: 80px;
+    padding: 8px;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    resize: vertical;
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 16px;
+}
+
+.screenspec-annotation-editor textarea:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.screenspec-annotation-editor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.screenspec-annotation-editor button {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.screenspec-annotation-editor .primary {
+    background: #27ae60;
+    color: white;
+}
+
+.screenspec-annotation-editor .primary:hover {
+    background: #219a52;
+}
+
+.screenspec-annotation-editor .secondary {
+    background: #95a5a6;
+    color: white;
+}
+
+.screenspec-annotation-editor .secondary:hover {
+    background: #7f8c8d;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .screenspec-toolbar {
+        left: 20px;
+        right: 20px;
+        transform: none;
+        width: auto;
+    }
+    
+    .screenspec-annotation-editor {
+        left: 20px;
+        right: 20px;
+        min-width: auto;
+        max-width: none;
+    }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .screenspec-toolbar {
+        background: rgba(44, 62, 80, 0.95);
+        color: white;
+    }
+    
+    .screenspec-toolbar-title {
+        color: white;
+    }
+    
+    .screenspec-annotation-editor {
+        background: #2c3e50;
+        color: white;
+    }
+    
+    .screenspec-annotation-editor h3 {
+        color: white;
+    }
+    
+    .screenspec-annotation-editor textarea {
+        background: #34495e;
+        border-color: #4a5f7a;
+        color: white;
+    }
+    
+    .screenspec-annotation-editor textarea:focus {
+        border-color: #3498db;
+    }
+}
+
+/* アクセシビリティ */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* 高コントラストモード */
+@media (prefers-contrast: high) {
+    .screenspec-annotation-marker {
+        border-width: 3px;
+        box-shadow: 0 0 0 2px #000;
+    }
+    
+    .screenspec-toolbar {
+        border: 2px solid #000;
+    }
+}
