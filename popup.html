@@ -4,170 +4,703 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ScreenSpec</title>
-    <link rel="stylesheet" href="styles/popup.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            width: 400px !important;
+            max-width: 400px !important;
+            min-width: 400px !important;
+        }
+
+        body {
+            width: 400px !important;
+            max-width: 400px !important;
+            min-width: 400px !important;
+            min-height: 500px;
+            max-height: 600px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        /* セクション共通スタイル */
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Google Drive セクション */
+        .drive-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .drive-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .drive-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .drive-status.connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .drive-status.disconnected {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .drive-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-drive {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 6px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-drive-connect {
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            color: white;
+        }
+
+        .btn-drive-sync {
+            background: #f1f3f4;
+            color: #5f6368;
+            border: 1px solid #dadce0;
+        }
+
+        .btn-drive-share {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            color: white;
+        }
+
+        .btn-drive:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .sync-info {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        /* プロジェクトセクション */
+        .current-project {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .project-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .project-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-meta {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .btn-manage {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            color: #374151;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* キャプチャボタン */
+        .capture-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-capture {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 8px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            background: #f9fafb;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: #374151;
+        }
+
+        .btn-capture:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .btn-capture .icon {
+            font-size: 20px;
+        }
+
+        .btn-capture .label {
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .btn-capture .desc {
+            font-size: 9px;
+            color: #6b7280;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* エクスポートボタン */
+        .btn-export {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px;
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-export:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 画面リスト */
+        .screens-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 16px;
+            color: #6b7280;
+        }
+
+        .empty-icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .empty-state p {
+            font-size: 12px;
+            margin-bottom: 2px;
+        }
+
+        .empty-hint {
+            font-size: 10px;
+            opacity: 0.8;
+        }
+
+        .screen-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            transition: background-color 0.2s;
+        }
+
+        .screen-item:hover {
+            background: #f3f4f6;
+        }
+
+        .screen-thumbnail {
+            width: 40px;
+            height: 26px;
+            object-fit: cover;
+            border-radius: 3px;
+            border: 1px solid #e5e7eb;
+            flex-shrink: 0;
+        }
+
+        .screen-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .screen-title {
+            font-weight: 500;
+            font-size: 11px;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .screen-meta {
+            font-size: 9px;
+            color: #6b7280;
+            margin-top: 1px;
+        }
+
+        .screen-actions {
+            display: flex;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
+        .btn-action {
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 3px;
+            background: #f3f4f6;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            transition: all 0.2s;
+        }
+
+        .btn-action:hover {
+            background: #e5e7eb;
+        }
+
+        /* モーダル - コンパクト化 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            width: 90%;
+            max-width: 380px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #6b7280;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #374151;
+            font-size: 12px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 12px;
+        }
+
+        .btn-cancel,
+        .btn-confirm {
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-cancel {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-confirm {
+            background: #3b82f6;
+            color: white;
+            border: none;
+        }
+
+        /* 通知 - コンパクト化 */
+        .notification {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            color: white;
+            font-size: 12px;
+            z-index: 1001;
+            max-width: 250px;
+        }
+
+        .notification.success { background: #10b981; }
+        .notification.error { background: #ef4444; }
+        .notification.warning { background: #f59e0b; }
+        .notification.info { background: #3b82f6; }
+
+        /* ローディング */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <!-- ヘッダー -->
-    <header class="header">
-        <div class="header-content">
-            <h1 class="title">
-                <span class="icon">📱</span>
-                ScreenSpec
-            </h1>
-            <div class="project-info">
-                <span class="current-project" id="currentProject">プロジェクト未選択</span>
-                <button class="btn-manage" id="btnManage" title="プロジェクト管理">
-                    ⚙️ 管理
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <h1>📋 ScreenSpec</h1>
+            <p>プロフェッショナルUI設計書作成ツール</p>
+        </div>
+
+        <!-- Google Drive セクション -->
+        <div class="section">
+            <div class="drive-header">
+                <div class="drive-title">
+                    <span>☁️</span>
+                    <span>Google Drive</span>
+                </div>
+                <div class="drive-status disconnected" id="driveStatus">未接続</div>
+            </div>
+            
+            <div class="drive-buttons">
+                <button id="btnDriveConnect" class="btn-drive btn-drive-connect">
+                    <span>🔗</span>
+                    <span>接続</span>
+                </button>
+                <button id="btnSync" class="btn-drive btn-drive-sync" disabled>
+                    <span>🔄</span>
+                    <span>同期</span>
+                </button>
+                <button id="btnShare" class="btn-drive btn-drive-share" disabled>
+                    <span>🤝</span>
+                    <span>共有</span>
+                </button>
+            </div>
+            
+            <div class="sync-info" id="syncInfo">
+                Google Driveに接続してチーム共有を開始
+            </div>
+        </div>
+
+        <!-- プロジェクトセクション -->
+        <div class="section">
+            <div class="current-project">
+                <div class="project-info">
+                    <div class="project-name" id="currentProject">プロジェクト未選択</div>
+                    <div class="project-meta" id="projectMeta">プロジェクトを選択または作成してください</div>
+                </div>
+                <button id="btnManage" class="btn-manage">📁 管理</button>
+            </div>
+        </div>
+
+        <!-- キャプチャセクション -->
+        <div class="section">
+            <div class="capture-buttons">
+                <button id="btnCaptureVisible" class="btn-capture">
+                    <div class="icon">📱</div>
+                    <div class="label">表示部分</div>
+                    <div class="desc">現在見えている画面をキャプチャ</div>
+                </button>
+                <button id="btnCaptureFull" class="btn-capture">
+                    <div class="icon">📄</div>
+                    <div class="label">ページ全体</div>
+                    <div class="desc">スクロール全体をキャプチャ</div>
                 </button>
             </div>
         </div>
-    </header>
 
-    <!-- メインコンテンツ -->
-    <main class="main-content">
-        <!-- キャプチャセクション -->
-        <section class="capture-section">
-            <h2 class="section-title">📸 キャプチャ</h2>
-            <div class="capture-buttons">
-                <button class="btn-primary" id="btnCaptureVisible">
-                    <span class="btn-icon">🖼️</span>
-                    表示部分をキャプチャ
-                </button>
-                <button class="btn-secondary" id="btnCaptureFull">
-                    <span class="btn-icon">📄</span>
-                    ページ全体をキャプチャ
-                </button>
-            </div>
-        </section>
+        <!-- エクスポートセクション -->
+        <div class="section">
+            <button id="btnExport" class="btn-export" disabled>
+                <span>📊</span>
+                <span>PDF設計書として出力</span>
+            </button>
+        </div>
 
-        <!-- 画面一覧セクション -->
-        <section class="screens-section">
-            <div class="section-header">
-                <h2 class="section-title">📋 キャプチャ済み画面</h2>
-                <div class="section-actions">
-                    <button class="btn-export" id="btnExport" disabled>
-                        <span class="btn-icon">📥</span>
-                        PDF出力
-                    </button>
-                </div>
-            </div>
-            <div class="screens-list" id="screensList">
+        <!-- 画面リストセクション -->
+        <div class="section">
+            <div class="screens-header">📷 キャプチャ画面</div>
+            <div id="screensList">
                 <div class="empty-state">
                     <div class="empty-icon">📷</div>
                     <p>まだキャプチャがありません</p>
                     <p class="empty-hint">上のボタンからキャプチャを開始してください</p>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </div>
 
-    <!-- プロジェクト管理モーダル -->
-    <div class="modal-overlay" id="projectModal" style="display: none;">
+    <!-- 共有モーダル -->
+    <div id="shareModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">📂 プロジェクト管理</h2>
-                <button class="btn-close" id="btnCloseModal">×</button>
+                <h3>🤝 プロジェクト共有</h3>
+                <button id="btnCloseShareModal" class="btn-close">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>共有するメールアドレス</label>
+                <textarea id="shareEmails" placeholder="example1@gmail.com&#10;example2@gmail.com&#10;複数の場合は改行で区切ってください"></textarea>
+            </div>
+            <div class="form-group">
+                <label>権限</label>
+                <select id="sharePermission">
+                    <option value="reader">閲覧のみ</option>
+                    <option value="commenter">コメント可能</option>
+                    <option value="writer">編集可能</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>共有リンク</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" id="shareLink" readonly placeholder="リンクを生成中..." style="flex: 1;">
+                    <button id="btnCopyLink" style="padding: 6px 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px;">コピー</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnCancelShare" class="btn-cancel">キャンセル</button>
+                <button id="btnConfirmShare" class="btn-confirm">共有する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- プロジェクト管理モーダル -->
+    <div id="projectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📁 プロジェクト管理</h3>
+                <button id="btnCloseModal" class="btn-close">&times;</button>
             </div>
             
-            <div class="modal-body">
-                <!-- 新規プロジェクト作成 -->
-                <div class="project-form">
-                    <h3 class="form-title">新規プロジェクト作成</h3>
-                    <div class="input-group">
-                        <label for="projectName">プロジェクト名</label>
-                        <input type="text" id="projectName" placeholder="例: ECサイトリニューアル" maxlength="50">
-                    </div>
-                    <div class="input-group">
-                        <label for="projectDescription">説明（任意）</label>
-                        <textarea id="projectDescription" placeholder="プロジェクトの詳細説明" maxlength="200"></textarea>
-                    </div>
-                    <button class="btn-create" id="btnCreateProject">
-                        <span class="btn-icon">➕</span>
-                        プロジェクト作成
-                    </button>
+            <!-- 検索 -->
+            <div class="form-group">
+                <input type="text" id="searchProjects" placeholder="🔍 プロジェクトを検索..." style="width: 100%;">
+            </div>
+            
+            <!-- プロジェクト一覧 -->
+            <div id="projectsContainer" style="max-height: 200px; overflow-y: auto; margin-bottom: 12px;">
+                <!-- プロジェクトカードがここに動的に追加されます -->
+            </div>
+            
+            <!-- 新規プロジェクト作成 -->
+            <div style="border-top: 1px solid #e5e7eb; padding-top: 12px;">
+                <h4 style="margin-bottom: 8px; color: #374151; font-size: 14px;">新しいプロジェクトを作成</h4>
+                <div class="form-group">
+                    <label for="projectName">プロジェクト名</label>
+                    <input type="text" id="projectName" placeholder="例: ECサイトリニューアル">
                 </div>
-
-                <!-- プロジェクト検索 -->
-                <div class="search-section">
-                    <div class="search-box">
-                        <input type="text" id="searchProjects" placeholder="🔍 プロジェクトを検索...">
-                    </div>
+                <div class="form-group">
+                    <label for="projectDescription">説明（オプション）</label>
+                    <textarea id="projectDescription" placeholder="プロジェクトの概要や目的を入力してください"></textarea>
                 </div>
-
-                <!-- プロジェクト一覧 -->
-                <div class="projects-list">
-                    <h3 class="form-title">既存プロジェクト</h3>
-                    <div class="projects-container" id="projectsContainer">
-                        <div class="empty-state">
-                            <div class="empty-icon">📁</div>
-                            <p>プロジェクトがありません</p>
-                        </div>
-                    </div>
-                </div>
+                <button id="btnCreateProject" style="width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 12px;">
+                    ✨ プロジェクトを作成
+                </button>
             </div>
         </div>
     </div>
 
     <!-- プロジェクト編集モーダル -->
-    <div class="modal-overlay" id="editProjectModal" style="display: none;">
+    <div id="editProjectModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">✏️ プロジェクト編集</h2>
-                <button class="btn-close" id="btnCloseEditModal">×</button>
+                <h3>✏️ プロジェクト編集</h3>
+                <button id="btnCloseEditModal" class="btn-close">&times;</button>
             </div>
-            
-            <div class="modal-body">
-                <div class="input-group">
-                    <label for="editProjectName">プロジェクト名</label>
-                    <input type="text" id="editProjectName" maxlength="50">
-                </div>
-                <div class="input-group">
-                    <label for="editProjectDescription">説明</label>
-                    <textarea id="editProjectDescription" maxlength="200"></textarea>
-                </div>
-                <div class="modal-actions">
-                    <button class="btn-save" id="btnSaveProject">
-                        <span class="btn-icon">💾</span>
-                        保存
-                    </button>
-                    <button class="btn-delete" id="btnDeleteProject">
-                        <span class="btn-icon">🗑️</span>
-                        削除
-                    </button>
-                </div>
+            <div class="form-group">
+                <label for="editProjectName">プロジェクト名</label>
+                <input type="text" id="editProjectName">
+            </div>
+            <div class="form-group">
+                <label for="editProjectDescription">説明</label>
+                <textarea id="editProjectDescription"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button id="btnDeleteProject" class="btn-cancel" style="background: #dc2626; color: white; border: none;">削除</button>
+                <button id="btnSaveProject" class="btn-confirm">保存</button>
             </div>
         </div>
     </div>
 
     <!-- 削除確認モーダル -->
-    <div class="modal-overlay" id="deleteConfirmModal" style="display: none;">
-        <div class="modal-content small">
+    <div id="deleteConfirmModal" class="modal">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">⚠️ 削除確認</h2>
+                <h3>⚠️ 削除確認</h3>
+                <button id="btnCloseDeleteModal" class="btn-close">&times;</button>
             </div>
-            
-            <div class="modal-body">
-                <p>このプロジェクトを削除しますか？</p>
-                <p class="warning-text">関連するすべてのキャプチャも削除されます。</p>
-                <div class="modal-actions">
-                    <button class="btn-cancel" id="btnCancelDelete">キャンセル</button>
-                    <button class="btn-confirm-delete" id="btnConfirmDelete">削除</button>
-                </div>
+            <div id="deleteConfirmMessage" style="margin-bottom: 12px; line-height: 1.4; font-size: 12px;">
+                <!-- 削除確認メッセージがここに表示されます -->
             </div>
-        </div>
-    </div>
-
-    <!-- ローディング -->
-    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
-        <div class="loading-content">
-            <div class="spinner"></div>
-            <p>処理中...</p>
+            <div class="modal-footer">
+                <button id="btnCancelDelete" class="btn-cancel">キャンセル</button>
+                <button id="btnConfirmDelete" class="btn-confirm" style="background: #dc2626;">削除する</button>
+            </div>
         </div>
     </div>
 
     <!-- 通知 -->
-    <div class="notification" id="notification" style="display: none;"></div>
+    <div id="notification" class="notification"></div>
 
+    <!-- ローディング -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- スクリプト -->
+    <script src="drive-manager.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

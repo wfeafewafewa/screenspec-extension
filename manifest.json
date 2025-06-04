@@ -3,22 +3,42 @@
     "name": "ScreenSpec - 画面設計書作成",
     "version": "2.0.0",
     "description": "Webページのキャプチャに注釈を付けて、プロフェッショナルなUI設計書を素早く作成できるツール",
+    
     "permissions": [
       "activeTab",
       "storage", 
       "scripting",
-      "tabs"
+      "tabs",
+      "identity"
     ],
+    
     "host_permissions": [
       "<all_urls>"
     ],
+    
+    "oauth2": {
+      "client_id": "224081046207-970j5qste6i7hc76c5hg2vkeds5mvppe.apps.googleusercontent.com",
+      "scopes": [
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/drive.metadata.readonly",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email"
+      ]
+    },
+    
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'"
+    },
+    
     "action": {
       "default_popup": "popup.html",
       "default_title": "ScreenSpec"
     },
+    
     "background": {
       "service_worker": "background.js"
     },
+    
     "web_accessible_resources": [
       {
         "resources": [
@@ -28,4 +48,4 @@
         "matches": ["<all_urls>"]
       }
     ]
-}
+  }

@@ -1,6 +1,6 @@
 /**
- * ScreenSpec - Popup UI Controller
- * プロジェクト管理機能付きの画面設計書作成ツール
+ * ScreenSpec - Popup UI Controller with Google Drive Integration
+ * プロジェクト管理機能付きの画面設計書作成ツール + Google Drive連携
  */
 
 class ScreenSpecUI {
@@ -9,6 +9,7 @@ class ScreenSpecUI {
         this.projects = [];
         this.screens = [];
         this.editingProject = null;
+        this.driveConnected = false;
         
         this.init();
     }
@@ -18,6 +19,9 @@ class ScreenSpecUI {
             await this.loadData();
             this.setupEventListeners();
             this.updateUI();
+            
+            // Google Drive接続状態をチェック
+            await this.initializeDriveFeatures();
         } catch (error) {
             console.error('Initialization error:', error);
             this.showNotification('初期化エラーが発生しました', 'error');
@@ -99,6 +103,36 @@ class ScreenSpecUI {
             this.exportPDF();
         });
 
+        // Google Drive機能
+        document.getElementById('btnDriveConnect')?.addEventListener('click', () => {
+            this.connectToDrive();
+        });
+
+        document.getElementById('btnSync')?.addEventListener('click', () => {
+            this.syncWithDrive();
+        });
+
+        document.getElementById('btnShare')?.addEventListener('click', () => {
+            this.openShareModal();
+        });
+
+        // 共有モーダル
+        document.getElementById('btnCloseShareModal')?.addEventListener('click', () => {
+            this.closeShareModal();
+        });
+
+        document.getElementById('btnCancelShare')?.addEventListener('click', () => {
+            this.closeShareModal();
+        });
+
+        document.getElementById('btnConfirmShare')?.addEventListener('click', () => {
+            this.confirmShare();
+        });
+
+        document.getElementById('btnCopyLink')?.addEventListener('click', () => {
+            this.copyShareLink();
+        });
+
         // モーダル外クリックで閉じる
         document.getElementById('projectModal')?.addEventListener('click', (e) => {
             if (e.target.id === 'projectModal') {
@@ -118,6 +152,12 @@ class ScreenSpecUI {
             }
         });
 
+        document.getElementById('shareModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'shareModal') {
+                this.closeShareModal();
+            }
+        });
+
         // Enterキーでプロジェクト作成
         document.getElementById('projectName')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -132,6 +172,333 @@ class ScreenSpecUI {
             }
         });
     }
+
+    // =============================================
+    // Google Drive連携機能
+    // =============================================
+
+    /**
+     * Google Drive機能の初期化
+     */
+    async initializeDriveFeatures() {
+        try {
+            console.log('Initializing Drive features...');
+            
+            // 既存の認証をチェック
+            await this.checkDriveConnection();
+            
+        } catch (error) {
+            console.error('Drive features initialization failed:', error);
+        }
+    }
+
+    /**
+     * 既存のGoogle Drive接続をチェック
+     */
+    async checkDriveConnection() {
+        try {
+            if (window.driveManager) {
+                const token = await window.driveManager.checkExistingAuth();
+                
+                if (token) {
+                    window.driveManager.accessToken = token;
+                    window.driveManager.isAuthenticated = true;
+                    await window.driveManager.loadUserInfo();
+                    this.driveConnected = true;
+                    this.updateDriveUI(true);
+                    console.log('Existing Drive connection found');
+                } else {
+                    this.updateDriveUI(false);
+                }
+            }
+        } catch (error) {
+            console.log('No existing auth token or error:', error);
+            this.updateDriveUI(false);
+        }
+    }
+
+    /**
+     * Google Driveに接続
+     */
+    async connectToDrive() {
+        try {
+            this.showLoading(true);
+            this.showNotification('Google Driveに接続中...', 'info');
+
+            if (!window.driveManager) {
+                throw new Error('DriveManagerが読み込まれていません');
+            }
+
+            const success = await window.driveManager.initialize();
+            
+            if (success) {
+                this.driveConnected = true;
+                this.showNotification(`Google Driveに接続しました！ (${window.driveManager.userInfo?.email})`, 'success');
+                this.updateDriveUI(true);
+                
+                // 自動同期を実行
+                setTimeout(() => {
+                    this.syncWithDrive();
+                }, 1000);
+            } else {
+                throw new Error('接続に失敗しました');
+            }
+            
+        } catch (error) {
+            console.error('Drive connection failed:', error);
+            this.showNotification('Google Drive接続に失敗しました: ' + error.message, 'error');
+            this.updateDriveUI(false);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    /**
+     * Google Driveと同期
+     */
+    async syncWithDrive() {
+        if (!this.driveConnected || !window.driveManager?.isAuthenticated) {
+            this.showNotification('最初にGoogle Driveに接続してください', 'warning');
+            return;
+        }
+
+        try {
+            this.showLoading(true);
+            this.showNotification('同期中...', 'info');
+
+            const result = await window.driveManager.performAutoSync();
+            
+            if (result.success) {
+                this.showNotification(result.message, 'success');
+                
+                // 同期後にローカルデータを再読み込み
+                await this.loadData();
+                this.updateUI();
+                this.updateSyncInfo('同期完了');
+            } else {
+                throw new Error(result.message);
+            }
+            
+        } catch (error) {
+            console.error('Sync failed:', error);
+            this.showNotification('同期に失敗しました: ' + error.message, 'error');
+            this.updateSyncInfo('同期エラー');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    /**
+     * 共有モーダルを開く
+     */
+    async openShareModal() {
+        if (!this.currentProject) {
+            this.showNotification('共有するプロジェクトを選択してください', 'warning');
+            return;
+        }
+
+        if (!this.driveConnected || !window.driveManager?.isAuthenticated) {
+            this.showNotification('最初にGoogle Driveに接続してください', 'warning');
+            return;
+        }
+
+        try {
+            this.showModal('shareModal');
+            this.showNotification('共有リンクを生成中...', 'info');
+            
+            // 共有リンクを生成
+            const shareLink = await window.driveManager.createShareLink(this.currentProject.id, 'reader');
+            
+            const shareLinkInput = document.getElementById('shareLink');
+            if (shareLinkInput) {
+                shareLinkInput.value = shareLink;
+            }
+            
+            this.showNotification('共有リンクを生成しました', 'success');
+            
+        } catch (error) {
+            console.error('Failed to create share link:', error);
+            this.showNotification('共有リンクの生成に失敗しました: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * 共有モーダルを閉じる
+     */
+    closeShareModal() {
+        this.hideModal('shareModal');
+        
+        // フォームをリセット
+        const shareEmailsTextarea = document.getElementById('shareEmails');
+        const sharePermissionSelect = document.getElementById('sharePermission');
+        const shareLinkInput = document.getElementById('shareLink');
+        
+        if (shareEmailsTextarea) shareEmailsTextarea.value = '';
+        if (sharePermissionSelect) sharePermissionSelect.value = 'reader';
+        if (shareLinkInput) shareLinkInput.value = '';
+    }
+
+    /**
+     * 共有を実行
+     */
+    async confirmShare() {
+        try {
+            const shareEmailsTextarea = document.getElementById('shareEmails');
+            const sharePermissionSelect = document.getElementById('sharePermission');
+            
+            if (!shareEmailsTextarea || !sharePermissionSelect) {
+                throw new Error('共有フォーム要素が見つかりません');
+            }
+
+            const emailsText = shareEmailsTextarea.value.trim();
+            const permission = sharePermissionSelect.value;
+
+            if (!emailsText) {
+                this.showNotification('メールアドレスを入力してください', 'warning');
+                return;
+            }
+
+            // メールアドレスを改行で分割して整理
+            const emails = emailsText
+                .split(/[\n,]/)
+                .map(email => email.trim())
+                .filter(email => email.length > 0);
+
+            if (emails.length === 0) {
+                this.showNotification('有効なメールアドレスを入力してください', 'warning');
+                return;
+            }
+
+            this.showLoading(true);
+            this.showNotification(`${emails.length}名にプロジェクトを共有中...`, 'info');
+
+            const shareResults = await window.driveManager.shareProject(
+                this.currentProject.id,
+                emails,
+                permission
+            );
+
+            // 結果を確認
+            const successCount = shareResults.filter(r => r.success).length;
+            const failureCount = shareResults.filter(r => !r.success).length;
+
+            if (successCount > 0) {
+                this.showNotification(
+                    `${successCount}名への共有が完了しました${failureCount > 0 ? ` (${failureCount}名は失敗)` : ''}`,
+                    failureCount > 0 ? 'warning' : 'success'
+                );
+            } else {
+                this.showNotification('共有に失敗しました', 'error');
+            }
+
+            // 失敗したメールアドレスがあれば表示
+            const failedEmails = shareResults
+                .filter(r => !r.success)
+                .map(r => `${r.email}: ${r.error}`)
+                .join('\n');
+
+            if (failedEmails) {
+                console.error('Share failures:', failedEmails);
+            }
+
+            this.closeShareModal();
+            
+        } catch (error) {
+            console.error('Share failed:', error);
+            this.showNotification('共有に失敗しました: ' + error.message, 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    /**
+     * 共有リンクをコピー
+     */
+    async copyShareLink() {
+        try {
+            const shareLinkInput = document.getElementById('shareLink');
+            if (!shareLinkInput || !shareLinkInput.value) {
+                this.showNotification('共有リンクがありません', 'warning');
+                return;
+            }
+
+            await navigator.clipboard.writeText(shareLinkInput.value);
+            this.showNotification('共有リンクをコピーしました', 'success');
+            
+        } catch (error) {
+            console.error('Failed to copy link:', error);
+            
+            // フォールバック: 手動選択
+            const shareLinkInput = document.getElementById('shareLink');
+            if (shareLinkInput) {
+                shareLinkInput.select();
+                shareLinkInput.setSelectionRange(0, 99999);
+                this.showNotification('リンクを選択しました。Ctrl+Cでコピーしてください', 'info');
+            }
+        }
+    }
+
+    /**
+     * Drive UI状態を更新
+     */
+    updateDriveUI(connected) {
+        const driveStatus = document.getElementById('driveStatus');
+        const connectBtn = document.getElementById('btnDriveConnect');
+        const syncBtn = document.getElementById('btnSync');
+        const shareBtn = document.getElementById('btnShare');
+
+        if (connected) {
+            // 接続済み状態
+            if (driveStatus) {
+                driveStatus.textContent = '接続済み';
+                driveStatus.className = 'drive-status connected';
+            }
+            
+            if (connectBtn) {
+                connectBtn.innerHTML = '<span>✅</span><span>接続済み</span>';
+                connectBtn.disabled = true;
+            }
+            
+            if (syncBtn) syncBtn.disabled = false;
+            if (shareBtn) shareBtn.disabled = false;
+            
+            this.updateSyncInfo(
+                window.driveManager?.userInfo?.email 
+                    ? `${window.driveManager.userInfo.email} でログイン中`
+                    : '同期準備完了'
+            );
+        } else {
+            // 未接続状態
+            if (driveStatus) {
+                driveStatus.textContent = '未接続';
+                driveStatus.className = 'drive-status disconnected';
+            }
+            
+            if (connectBtn) {
+                connectBtn.innerHTML = '<span>🔗</span><span>Drive接続</span>';
+                connectBtn.disabled = false;
+            }
+            
+            if (syncBtn) syncBtn.disabled = true;
+            if (shareBtn) shareBtn.disabled = true;
+            
+            this.updateSyncInfo('Google Driveに接続してチーム共有を開始');
+        }
+    }
+
+    /**
+     * 同期情報を更新
+     */
+    updateSyncInfo(message) {
+        const syncInfo = document.getElementById('syncInfo');
+        if (syncInfo) {
+            syncInfo.textContent = message;
+        }
+    }
+
+    // =============================================
+    // 既存の機能（変更なし）
+    // =============================================
 
     async captureScreen(type) {
         try {
@@ -156,6 +523,13 @@ class ScreenSpecUI {
                 this.updateScreensList();
                 this.updateCurrentProjectDisplay();
                 this.showNotification(`${type === 'visible' ? '表示部分' : 'ページ全体'}のキャプチャが完了しました`);
+                
+                // キャプチャ後に自動同期（Drive接続時）
+                if (this.driveConnected && window.driveManager?.isAuthenticated) {
+                    setTimeout(() => {
+                        this.syncWithDrive();
+                    }, 1000);
+                }
             } else {
                 throw new Error(response?.error || 'キャプチャに失敗しました');
             }
@@ -218,6 +592,13 @@ class ScreenSpecUI {
             this.updateProjectsList();
             this.closeProjectModal();
             this.showNotification(`プロジェクト「${name}」を作成しました`);
+            
+            // プロジェクト作成後に自動同期（Drive接続時）
+            if (this.driveConnected && window.driveManager?.isAuthenticated) {
+                setTimeout(() => {
+                    this.syncWithDrive();
+                }, 1000);
+            }
         } catch (error) {
             console.error('Failed to create project:', error);
             this.showNotification('プロジェクト作成に失敗しました', 'error');
@@ -460,15 +841,24 @@ class ScreenSpecUI {
 
     updateCurrentProjectDisplay() {
         const currentProjectElement = document.getElementById('currentProject');
+        const projectMetaElement = document.getElementById('projectMeta');
+        
         if (currentProjectElement) {
             if (this.currentProject) {
                 currentProjectElement.textContent = this.currentProject.name;
                 currentProjectElement.style.color = this.currentProject.color;
-                currentProjectElement.title = this.currentProject.description || '';
+                
+                if (projectMetaElement) {
+                    const screenCount = this.screens.filter(s => s.projectId === this.currentProject.id).length;
+                    projectMetaElement.textContent = `${screenCount} 画面 • ${this.formatDate(this.currentProject.createdAt)}`;
+                }
             } else {
                 currentProjectElement.textContent = 'プロジェクト未選択';
                 currentProjectElement.style.color = '#7f8c8d';
-                currentProjectElement.title = 'プロジェクトを選択してください';
+                
+                if (projectMetaElement) {
+                    projectMetaElement.textContent = 'プロジェクトを選択または作成してください';
+                }
             }
         }
     }
@@ -699,6 +1089,7 @@ class ScreenSpecUI {
         this.hideModal('projectModal');
         this.hideModal('editProjectModal');
         this.hideModal('deleteConfirmModal');
+        this.hideModal('shareModal');
     }
 
     generateRandomColor() {
@@ -784,7 +1175,7 @@ class ScreenSpecUI {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('ScreenSpec UI initializing...');
+    console.log('ScreenSpec UI with Drive integration initializing...');
     new ScreenSpecUI();
 });
 
